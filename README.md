@@ -15,3 +15,12 @@ words2num "twenty twenty-five"           # 2025
 words2num -4 "nineteen eighty-four"      # 1984
 echo "Chapter Twenty-One" | words2num --replace
 # → Chapter 21
+
+
+## Compiling
+
+clone repo
+cd words2num/src
+cargo build --release
+cp ../target/release/words2num <destination>
+
