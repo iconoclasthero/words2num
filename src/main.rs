@@ -8,16 +8,20 @@ macro_rules! hashmap {
 
 use std::env;
 use std::io::{self, BufRead};
+use regex::Regex;
 
 fn main() {
     let mut additive = false;
     let mut help = false;
     let mut pad = None;
+    let mut replace_mode = false;
     let mut filtered = vec![];
 
     for arg in env::args().skip(1) {
         if arg == "--add" || arg == "--math" {
             additive = true;
+        } else if arg == "--replace" {
+            replace_mode = true;
         } else if arg == "-h" || arg == "--help" {
             help = true;
         } else if let Some(rest) = arg.strip_prefix('-') {
@@ -33,6 +37,59 @@ fn main() {
 
     if help {
         print_help();
+        return;
+    }
+
+//    if replace_mode {
+//        if filtered.is_empty() {
+//            for line in io::stdin().lock().lines() {
+//                let line = line.unwrap_or_default();
+//                println!("{}", replace_number_words(&line));
+//            }
+//        } else {
+//            let input = filtered.join(" ");
+//            println!("{}", replace_number_words(&input));
+//        }
+//        return;
+//    }
+    if replace_mode {
+        use std::io::{self, BufRead};
+
+        if atty::is(atty::Stream::Stdin) {
+            // CLI input
+//            for arg in &args {
+            for arg in &filtered {
+                let orig = arg;
+//                let stripped = arg.trim_matches('"');
+//                let replaced = replace_number_words(stripped);
+//                println!("\"{}\"", replaced);
+                let has_quotes = arg.starts_with('"') && arg.ends_with('"');
+                let stripped = arg.trim_matches('"');
+                let replaced = replace_number_words(stripped, pad);
+                if has_quotes {
+                    println!("\"{}\"", replaced);
+                } else {
+                    println!("{}", replaced);
+                }
+            }
+        } else {
+            // stdin input
+            for line in io::stdin().lock().lines() {
+                let line = line.unwrap();
+//                let stripped = line.trim_matches('"');
+//                let replaced = replace_number_words(stripped);
+//                println!("\"{}\"", replaced);
+                let has_quotes = line.starts_with('"') && line.ends_with('"');
+                let stripped = line.trim_matches('"');
+                let replaced = replace_number_words(stripped, pad);
+                if has_quotes {
+                    println!("\"{}\"", replaced);
+                } else {
+                    println!("{}", replaced);
+                }
+            }
+        }
+
         return;
     }
 
@@ -75,13 +132,18 @@ fn print_help() {
   words2num [OPTIONS] \"twenty oh five\"
   echo \"four sixty seven\" | words2num -3
   words2num --add \"four hundred sixty two\"
+  words2num --replace \"Chapter Twenty-One\"
 
 Options:
   -[N]           Zero-pad to N digits (e.g. -2 for 01)
   --add, --math  Use additive parsing (e.g. 400 + 20 + 2)
+  --replace      Replace number words in context
   -h, --help     Show this help message"
     );
 }
+
+
+
 
 fn words_to_number_concat(s: &str) -> Option<i64> {
     let units = hashmap![
@@ -106,6 +168,7 @@ fn words_to_number_concat(s: &str) -> Option<i64> {
         .split_whitespace()
         .filter(|w| *w != "and")
         .collect();
+//    println!("concat debug: {:?}", words);
 
     let mut result = 0;
     let mut current = 0;
@@ -189,4 +252,39 @@ fn words_to_number_additive(s: &str) -> Option<i64> {
     }
 
     Some(total + current)
+}
+
+fn replace_number_words(line: &str, pad: Option<usize>) -> String {
+    let re = Regex::new(r#"(?ix)
+        \b
+        (?:
+            zero|oh|one|two|three|four|five|six|seven|eight|nine|
+            ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|
+            seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|
+            sixty|seventy|eighty|ninety|hundred|thousand
+        )
+        (?:[\s-]+
+            (?:
+                zero|oh|one|two|three|four|five|six|seven|eight|nine|
+                ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|
+                seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|
+                sixty|seventy|eighty|ninety
+            )
+        )*
+        \b
+    "#).unwrap();
+
+    re.replace_all(line, |caps: &regex::Captures| {
+        let s = caps.get(0).unwrap().as_str().to_lowercase();
+        match words_to_number_concat(&s) {
+            Some(n) => {
+                if let Some(width) = pad {
+                    format!("{:0width$}", n, width = width)
+                } else {
+                    n.to_string()
+                }
+            }
+            None => caps[0].to_string(),
+        }
+    }).into_owned()
 }
