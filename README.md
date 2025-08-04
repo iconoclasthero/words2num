@@ -18,9 +18,9 @@ echo "Chapter Twenty-One" | words2num --replace
 ```
 
 ## Compiling
-
+```
 clone repo
 cd words2num/src
 cargo build --release
 cp ../target/release/words2num <destination>
-
+```
