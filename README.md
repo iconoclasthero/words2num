@@ -24,3 +24,16 @@ cd words2num/src
 cargo build --release
 cp ../target/release/words2num <destination>
 ```
+
+## Converting ABS `metadata.json` 
+
+- To convert the AudioBookShelf chapter index in the metadata.json to 2-digit numerals:
+
+```
+readarray -t titles < <(jq -r '.chapters[].title' updated.json | words2num --replace -2)
+jq --argjson newtitles "$(printf '%s\n' "${titles[@]}" | jq -R . | jq -s .)" '
+  .chapters |= [range(0; length) as $i | .[$i].title = $newtitles[$i] | .[$i]]
+' metadata.json > updated.json
+jq -r '.chapters[].title' updated.json
+```
+- After **verifying** changes are successfull, (and perhaps after a `cp metadata.json metadata.json-$(date)` to make a backup) `mv updated.json metadata.json` 
